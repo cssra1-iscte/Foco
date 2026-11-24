@@ -191,7 +191,7 @@ textarea.in{min-height:80px;resize:vertical}
 .emg{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:4px}
 .emg button{aspect-ratio:1;border-radius:10px;font-size:21px;line-height:1;display:grid;place-items:center;background:var(--bg)}
 .emg button.on{background:var(--acc2);outline:2px solid var(--acc)}
-.emg button.no{font-size:12px;color:var(--mut);font-weight:600}
+.emg button.no{font-size:22px;color:var(--mut);font-weight:500}
 .em{font-style:normal;margin-right:6px}
 .wd .ems{position:absolute;bottom:3px;left:0;right:0;font-size:11px;line-height:1;white-space:nowrap;overflow:hidden;letter-spacing:-2px}
 .md .ems{position:absolute;bottom:1px;font-size:10px;line-height:1}
@@ -497,7 +497,7 @@ function sheetHTML(){
   ${d.id?'':`<div class="seg" style="margin-bottom:16px">${['task','event','goal'].map(t=>`<button type="button" class="${d.type===t?'on':''}" data-a="ty" data-t="${t}">${TL[t]}</button>`).join('')}</div>`}
   <form data-f="item">
   <label class="fl"><span>Título</span><input class="in" name="title" value="${esc(d.title)}" required maxlength="120" placeholder="${d.type==='goal'?'Ex.: Aprender a tocar guitarra':d.type==='event'?'Ex.: Consulta no dentista':'Ex.: Enviar relatório'}"></label>
-  <div class="fl"><span>Emoji</span><div class="emg"><button type="button" class="no ${d.emoji?'':'on'}" data-a="emo" data-e="">Nenhum</button>${EMO.map(e=>`<button type="button" class="${d.emoji===e?'on':''}" data-a="emo" data-e="${e}" aria-label="Emoji ${e}">${e}</button>`).join('')}</div>
+  <div class="fl"><span>Emoji</span><div class="emg"><button type="button" class="no ${d.emoji?'':'on'}" data-a="emo" data-e="" aria-label="Sem emoji" title="Sem emoji">ø</button>${EMO.map(e=>`<button type="button" class="${d.emoji===e?'on':''}" data-a="emo" data-e="${e}" aria-label="Emoji ${e}">${e}</button>`).join('')}</div>
   <input class="in" name="emoji" value="${esc(d.emoji||'')}" maxlength="16" placeholder="Ou escreve/cola outro emoji" style="margin-top:6px"></div>
   <label class="fl"><span>Área</span><select class="in" name="areaId"><option value="">Sem área</option>${S.areas.map(a=>`<option value="${a.id}" ${d.areaId===a.id?'selected':''}>${esc(a.name)}</option>`).join('')}</select></label>
   <div class="row2"><label class="fl"><span>${d.type==='goal'?'Início':'Data'}</span><input class="in" type="date" name="date" value="${d.date||''}"></label>
