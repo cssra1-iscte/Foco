@@ -296,6 +296,13 @@ function goalCard(g){
   <div class="bm"><span>${a?esc(a.name):'Sem área'}</span><b>${p.dn} de ${p.tot}</b></div>
   <div class="bar"><i style="width:${p.p}%"></i></div></button>`;
 }
+const backBar=t=>`<div class="top"><button class="ib" data-a="back" aria-label="Voltar">${ic('back')}</button><b class="sp" style="text-align:center">${t}</b><span style="width:44px;flex:none"></span></div>`;
+// in-app history so the phone back button works too
+const stack=[];
+function nav(ch){stack.push({view:ui.view,detail:ui.detail,area:ui.area});Object.assign(ui,ch);try{history.pushState({n:stack.length},'')}catch(e){}scrollTo(0,0);render()}
+function goBack(){if(stack.length){try{history.back();return}catch(e){}}restore(stack.pop())}
+function restore(p){Object.assign(ui,p||{view:'home',detail:null,area:null});scrollTo(0,0);render()}
+addEventListener('popstate',()=>{if(ui.sheet){ui.sheet=null;try{history.pushState({},'')}catch(e){}render();return}restore(stack.pop())});
 const empty=t=>`<div class="empty">${t}</div>`;
 
 /* ---------- views ---------- */
@@ -353,7 +360,7 @@ function vCal(){
     if(!at.length&&h!==nowH&&(h%2))return'';
     return`<div class="h ${h===nowH?'now':''}"><span>${pad(h)}:00</span></div><div class="s">${at.map(ev).join('')}</div>`}).join('');
   const early=items.filter(i=>i.time&&+i.time.slice(0,2)<6);
-  return`<div class="mh"><b>${MON[d.getMonth()]} ${d.getFullYear()}</b>
+  return`${backBar('Calendário')}<div class="mh"><b>${MON[d.getMonth()]} ${d.getFullYear()}</b>
   <button class="ib" data-a="shift" data-n="-1" aria-label="Anterior">${ic('back')}</button><button class="ib" data-a="shift" data-n="1" aria-label="Seguinte">${ic('fwd')}</button></div>
   <div class="tabs"><button class="tab ${ui.monthOpen?'':'on'}" data-a="mode" data-m="0">Semana</button><button class="tab ${ui.monthOpen?'on':''}" data-a="mode" data-m="1">Mês</button><button class="tab" data-a="day" data-d="${t}">Hoje</button></div>
   ${body}
@@ -367,13 +374,13 @@ function vAreas(){
     const a=area(ui.area);if(!a){ui.area=null;return vAreas()}
     const its=S.items.filter(i=>i.areaId===a.id);
     const g=its.filter(i=>i.type==='goal'),o=its.filter(i=>i.type!=='goal'&&!isDone(i)),dn=its.filter(i=>i.type!=='goal'&&isDone(i));
-    return`<div class="top"><button class="ib" data-a="areaX" aria-label="Voltar">${ic('back')}</button><b class="sp" style="text-align:center">Área</b><button class="ib" data-a="areaEd" aria-label="Editar área">${ic('edit')}</button></div>
+    return`<div class="top"><button class="ib" data-a="back" aria-label="Voltar">${ic('back')}</button><b class="sp" style="text-align:center">Área</b><button class="ib" data-a="areaEd" aria-label="Editar área">${ic('edit')}</button></div>
     <h1 style="display:flex;gap:12px;align-items:center"><span class="dot" style="background:${a.color};width:16px;height:16px"></span>${esc(a.name)}</h1>
     <h2>Objetivos</h2>${g.length?`<div class="list">${g.map(row).join('')}</div>`:empty('Sem objetivos nesta área.')}
     <h2>Por fazer <button data-a="new" data-area="${a.id}">+ Adicionar</button></h2>${o.length?`<div class="list">${o.map(row).join('')}</div>`:empty('Tudo em dia.')}
     ${dn.length?`<h2>Concluídas</h2><div class="list">${dn.map(row).join('')}</div>`:''}`;
   }
-  return`<h1>Áreas da vida</h1><div class="ag">${S.areas.map(a=>{
+  return`${backBar('Áreas')}<h1>Áreas da vida</h1><div class="ag">${S.areas.map(a=>{
     const its=S.items.filter(i=>i.areaId===a.id&&i.type!=='goal'),dn=its.filter(isDone).length,gs=S.items.filter(i=>i.areaId===a.id&&i.type==='goal').length;
     const p=its.length?Math.round(dn/its.length*100):0;
     return`<button class="ac" data-a="area" data-id="${a.id}" style="background:${tint(a.color,16)}"><span class="dot" style="background:${a.color};width:14px;height:14px"></span><b>${esc(a.name)}</b><small>${its.length-dn} por fazer · ${gs} objetivo${gs===1?'':'s'}</small><div class="bar"><i style="width:${p}%;background:${a.color}"></i></div></button>`}).join('')}
@@ -386,7 +393,7 @@ function vGoals(){
   const card=g=>{const p=goalProg(g),c=acol(g.areaId);return`<button class="gc" style="flex:none;width:100%" data-a="open" data-id="${g.id}">
     <div class="chips"><span class="chip p-${g.priority}">${PL[g.priority]}</span>${g.due?`<span class="chip" style="background:var(--acc2);color:var(--acc)">até ${fmt(g.due)}</span>`:''}</div>
     <h3>${esc(g.title)}</h3><div class="bm"><span>${p.p}%</span><b>${p.dn} de ${p.tot}</b></div><div class="bar"><i style="width:${p.p}%;background:${c}"></i></div></button>`};
-  return`<h1>Objetivos</h1>
+  return`${backBar('Objetivos')}<h1>Objetivos</h1>
   ${act.length?by.map(([a,gs])=>`<h2 style="justify-content:flex-start;gap:8px"><span class="dot" style="background:${a.color}"></span>${esc(a.name)}</h2><div class="list">${gs.map(card).join('')}</div>`).join('')+(none.length?`<h2>Sem área</h2><div class="list">${none.map(card).join('')}</div>`:''):empty('Define um objetivo e liga-lhe tarefas para veres o progresso.')}
   ${dn.length?`<h2>Alcançados 🎉</h2><div class="list">${dn.map(card).join('')}</div>`:''}
   <div style="margin-top:20px"><button class="btn" style="width:100%" data-a="new" data-t="goal">+ Novo objetivo</button></div>`;
@@ -414,7 +421,7 @@ function vStats(){
     const exp=tot>0?Math.max(0,Math.min(100,el/tot*100)):100;return p+10>=exp?['ok','No ritmo']:['late','Atrasado']};
   const pend=['alta','media','baixa'].map(k=>({k,n:tasks.filter(i=>!isDone(i)&&i.priority===k).length}));
   const pt=Math.max(1,pend.reduce((s,x)=>s+x.n,0));
-  return`<h1>Estatísticas</h1>
+  return`${backBar('Estatísticas')}<h1>Estatísticas</h1>
   <div class="tabs">${[[7,'7 dias'],[30,'30 dias'],[0,'Tudo']].map(([k,l])=>`<button class="tab ${P===k?'on':''}" data-a="per" data-p="${k}">${l}</button>`).join('')}</div>
   <div class="kp"><div class="c3"><span>Tarefas concluídas</span><b>${doneP.length}</b></div>
   <div class="c1"><span>Taxa de conclusão</span><b>${rate}<small>%</small></b></div>
@@ -444,7 +451,7 @@ function vDetail(){
     prog+=`<h2>Tarefas ligadas <button data-a="new" data-goal="${i.id}">+ Tarefa</button></h2>${kids.length?`<div class="list">${kids.map(row).join('')}</div>`:empty('Liga tarefas a este objetivo para o ires concretizando.')}`;
   }
   const goal=i.goalId&&S.items.find(g=>g.id===i.goalId);
-  return`<div class="dt"><div class="top"><button class="ib" data-a="close" aria-label="Voltar">${ic('back')}</button><b class="sp" style="text-align:center">${TL[i.type]}</b><button class="ib" data-a="edit" aria-label="Editar">${ic('edit')}</button></div>
+  return`<div class="dt"><div class="top"><button class="ib" data-a="back" aria-label="Voltar">${ic('back')}</button><b class="sp" style="text-align:center">${TL[i.type]}</b><button class="ib" data-a="edit" aria-label="Editar">${ic('edit')}</button></div>
   <div class="chips"><span class="chip p-${i.priority}">${PL[i.priority]}</span>${a?`<span class="chip" style="background:${tint(c,20)};color:${c}">${esc(a.name)}</span>`:''}${i.type!=='event'?`<span class="chip" style="background:var(--acc2);color:var(--acc)">${i.type==='goal'?(isDone(i)?'Alcançado':SL[i.status]):SL[i.status]}</span>`:''}</div>
   <h1>${esc(i.title)}</h1>
   <div class="dates"><div><i>${ic('cal')}</i><span><small>${i.type==='goal'?'Início':'Data'}</small><b>${i.date?fmt(i.date):'—'}</b></span></div>
@@ -513,14 +520,14 @@ document.addEventListener('click',e=>{
   const cur=()=>S.items.find(x=>x.id===ui.detail);
   switch(a){
     case'start':start(false);break;case'startS':start(true);break;
-    case'go':ui.view=b.dataset.v;ui.detail=null;ui.area=null;scrollTo(0,0);render();break;
+    case'go':if(ui.view!==b.dataset.v||ui.detail||ui.area)nav({view:b.dataset.v,detail:null,area:null});break;
+    case'back':goBack();break;
     case'filt':ui.filter=b.dataset.f;render();break;
-    case'open':ui.detail=id;scrollTo(0,0);render();break;
-    case'close':ui.detail=null;render();break;
+    case'open':nav({detail:id});break;
     case'tog':{const i=S.items.find(x=>x.id===id);setSt(i,isDone(i)?'todo':'done');commit(isDone(i)?'Concluída ✓':'');break}
     case'stat':{const i=cur();setSt(i,b.dataset.s);commit(i.type==='goal'&&isDone(i)?'Objetivo alcançado 🎉':'');break}
     case'sub':{const i=cur();i.subs[+b.dataset.k].d=b.checked;commit();break}
-    case'del':ui.sheet={kind:'confirm',title:'Apagar este item?',text:'Esta ação não pode ser desfeita.',ok:'Apagar',fn:()=>{S.items=S.items.filter(x=>x.id!==ui.detail);S.items.forEach(x=>{if(x.goalId===ui.detail)x.goalId=''});ui.detail=null}};render();break;
+    case'del':ui.sheet={kind:'confirm',title:'Apagar este item?',text:'Esta ação não pode ser desfeita.',ok:'Apagar',fn:()=>{S.items=S.items.filter(x=>x.id!==ui.detail);S.items.forEach(x=>{if(x.goalId===ui.detail)x.goalId=''});ui.detail=null;if(stack.length)try{history.back()}catch(e){stack.pop()}}};render();break;
     case'ok':{const{fn,msg}=ui.sheet;ui.sheet=null;fn();commit(msg||'Apagado');break}
     case'edit':ui.sheet={kind:'item',d:JSON.parse(JSON.stringify(Object.assign(newItem(),cur())))};render();break;
     case'new':ui.sheet={kind:'item',d:newItem({type:b.dataset.t||'task',date:b.dataset.d||(ui.view==='cal'?ui.day:today()),areaId:b.dataset.area||(b.dataset.goal?(S.items.find(g=>g.id===b.dataset.goal)||{}).areaId:'')||ui.area||'',goalId:b.dataset.goal||''})};render();break;
@@ -531,12 +538,11 @@ document.addEventListener('click',e=>{
     case'day':ui.day=b.dataset.d;render();break;
     case'mode':ui.monthOpen=b.dataset.m==='1';render();break;
     case'shift':{const n=+b.dataset.n;if(ui.monthOpen){const d=parse(ui.day);d.setDate(1);d.setMonth(d.getMonth()+n);ui.day=ymd(d)}else ui.day=addD(ui.day,7*n);render();break}
-    case'area':ui.area=id;scrollTo(0,0);render();break;
-    case'areaX':ui.area=null;render();break;
+    case'area':nav({area:id});break;
     case'areaNew':ui.sheet={kind:'area',d:{id:'',name:'',color:COLORS[S.areas.length%COLORS.length]}};render();break;
     case'areaEd':ui.sheet={kind:'area',d:Object.assign({},area(ui.area))};render();break;
     case'col':{const f=document.querySelector('form[data-f=area]');ui.sheet.d.name=f.querySelector('[name=n]').value;ui.sheet.d.color=b.dataset.c;render();break}
-    case'areaDel':{const aid=ui.sheet.d.id;ui.sheet={kind:'confirm',title:'Apagar esta área?',text:'Os itens desta área ficam sem área, não são apagados.',ok:'Apagar área',fn:()=>{S.areas=S.areas.filter(x=>x.id!==aid);S.items.forEach(x=>{if(x.areaId===aid)x.areaId=''});ui.area=null}};render();break}
+    case'areaDel':{const aid=ui.sheet.d.id;ui.sheet={kind:'confirm',title:'Apagar esta área?',text:'Os itens desta área ficam sem área, não são apagados.',ok:'Apagar área',fn:()=>{S.areas=S.areas.filter(x=>x.id!==aid);S.items.forEach(x=>{if(x.areaId===aid)x.areaId=''});ui.area=null;if(stack.length)try{history.back()}catch(e){stack.pop()}}};render();break}
     case'per':ui.per=+b.dataset.p;render();break;
     case'bk':ui.sheet={kind:'bk'};render();break;
     case'exp':{const bl=new Blob([JSON.stringify(S,null,2)],{type:'application/json'});const u=URL.createObjectURL(bl);const l=document.createElement('a');l.href=u;l.download='foco-'+today()+'.json';document.body.appendChild(l);l.click();l.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);toast('Ficheiro exportado');break}
