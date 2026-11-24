@@ -224,6 +224,9 @@ const DOW=['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 const MON=['janeiro','fevereiro','março','abril','maio','junho','julho','agosto','setembro','outubro','novembro','dezembro'];
 const fmt=s=>{if(!s)return'';const d=parse(s);return`${d.getDate()} ${MON[d.getMonth()].slice(0,3)} ${d.getFullYear()}`};
 const fmtS=s=>{if(!s)return'';if(s===today())return'Hoje';if(s===addD(today(),1))return'Amanhã';const d=parse(s);return`${d.getDate()} ${MON[d.getMonth()].slice(0,3)}`};
+const fmtDur=m=>{m=+m||0;if(!m)return'';const h=Math.floor(m/60),r=m%60;return h?(h+'h'+(r?' '+pad(r)+'m':'')):r+'m'};
+const addMin=(t,m)=>{const[h,x]=t.split(':').map(Number);const v=(h*60+x+(+m||0))%1440;return pad(Math.floor(v/60))+':'+pad(v%60)};
+const endOf=i=>i.end||(i.type==='task'&&i.time&&i.dur?addMin(i.time,i.dur):'');
 const TL={task:'Tarefa',event:'Evento',goal:'Objetivo'};
 const PL={alta:'Alta prioridade',media:'Média',baixa:'Baixa'};
 const SL={todo:'Por fazer',doing:'Em progresso',done:'Concluída'};
@@ -263,10 +266,10 @@ function start(withSamples){
       {id:g1,type:'goal',title:'Correr uma meia maratona',areaId:sa,date:t,due:addD(t,120),priority:'alta',status:'doing',notes:'Plano de treino de 16 semanas, 3 corridas por semana.',subs:[{t:'Comprar sapatilhas novas',d:true},{t:'Inscrever na prova',d:false}]},
       {id:g2,type:'goal',title:'Passar no exame de certificação',areaId:es,date:t,due:addD(t,45),priority:'alta',status:'doing',notes:'Estudar 1h por dia nos dias úteis.',subs:[]},
       {id:g3,type:'goal',title:'Fundo de emergência de 6 meses',areaId:fi,date:t,due:addD(t,300),priority:'media',status:'todo',notes:'',subs:[{t:'Definir valor mensal',d:true},{t:'Criar transferência automática',d:false},{t:'Rever em junho',d:false}]},
-      {id:uid(),type:'task',title:'Rever módulo 3 do curso',areaId:es,goalId:g2,date:t,time:'19:00',priority:'alta',status:'doing',notes:'',subs:[]},
-      {id:uid(),type:'task',title:'Simulado de exame',areaId:es,goalId:g2,date:addD(t,3),time:'10:00',priority:'media',status:'todo',notes:'',subs:[]},
+      {id:uid(),type:'task',title:'Rever módulo 3 do curso',areaId:es,goalId:g2,date:t,time:'19:00',dur:60,priority:'alta',status:'doing',notes:'',subs:[]},
+      {id:uid(),type:'task',title:'Simulado de exame',areaId:es,goalId:g2,date:addD(t,3),time:'10:00',dur:120,priority:'media',status:'todo',notes:'',subs:[]},
       {id:uid(),type:'task',title:'Ler documentação oficial',areaId:es,goalId:g2,date:addD(t,-1),priority:'baixa',status:'done',notes:'',subs:[]},
-      {id:uid(),type:'task',title:'Corrida leve 5 km',areaId:sa,goalId:g1,date:t,time:'07:30',priority:'media',status:'done',notes:'',subs:[]},
+      {id:uid(),type:'task',title:'Corrida leve 5 km',areaId:sa,goalId:g1,date:t,time:'07:30',dur:35,priority:'media',status:'done',notes:'',subs:[]},
       {id:uid(),type:'task',title:'Treino de intervalos',areaId:sa,goalId:g1,date:addD(t,2),time:'07:30',priority:'media',status:'todo',notes:'',subs:[]},
       {id:uid(),type:'event',title:'Reunião de equipa',areaId:ca,date:t,time:'10:00',end:'10:30',priority:'media',status:'todo',notes:'Teams',subs:[]},
       {id:uid(),type:'event',title:'Jantar com amigos',areaId:pe,date:addD(t,1),time:'20:30',end:'22:30',priority:'baixa',status:'todo',notes:'',subs:[]},
@@ -282,7 +285,7 @@ function row(i){
   const lead=i.type==='task'
     ?`<button class="ck ${isDone(i)?'d':''}" data-a="tog" data-id="${i.id}" aria-label="Marcar como concluída">${isDone(i)?ic('check',3):''}</button>`
     :`<span class="ty" style="background:${tint(c,18)};color:${c}">${ic(i.type==='event'?'event':'target')}</span>`;
-  const when=[fmtS(i.date),i.time?(i.time+(i.end?'–'+i.end:'')):''].filter(Boolean).join(' · ');
+  const when=[fmtS(i.date),i.time?(i.time+(endOf(i)?'–'+endOf(i):'')):'',i.type==='task'&&i.dur&&!i.time?'⏱ '+fmtDur(i.dur):''].filter(Boolean).join(' · ');
   return`<div class="it ${i.type==='task'&&isDone(i)?'done':''}">${lead}
   <button class="bd" data-a="open" data-id="${i.id}"><span class="tt">${esc(i.title)}</span>
   <span class="mt">${a?`<span style="display:inline-flex;gap:5px;align-items:center"><span class="dot" style="background:${c};width:7px;height:7px"></span>${esc(a.name)}</span>`:''}${when?`<span>${when}</span>`:''}${i.type==='task'&&i.status==='doing'?'<span style="color:var(--acc);font-weight:600">Em progresso</span>':''}</span></button>
@@ -355,7 +358,7 @@ function vCal(){
   const items=itemsOn(ui.day),untimed=items.filter(i=>!i.time),dueG=S.items.filter(i=>i.type==='goal'&&i.due===ui.day);
   const hrs=[];for(let h=6;h<=23;h++)hrs.push(h);
   const nowH=ui.day===t?new Date().getHours():-1;
-  const ev=i=>{const c=acol(i.areaId);return`<button class="ev" data-a="open" data-id="${i.id}" style="background:${tint(c,20)};${isDone(i)?'opacity:.55':''}"><b style="${isDone(i)?'text-decoration:line-through':''}">${esc(i.title)}</b><small>${i.time}${i.end?' – '+i.end:''} · ${TL[i.type]}${area(i.areaId)?' · '+esc(area(i.areaId).name):''}</small></button>`};
+  const ev=i=>{const c=acol(i.areaId);return`<button class="ev" data-a="open" data-id="${i.id}" style="background:${tint(c,20)};${isDone(i)?'opacity:.55':''}"><b style="${isDone(i)?'text-decoration:line-through':''}">${esc(i.title)}</b><small>${i.time}${endOf(i)?' – '+endOf(i):''}${i.dur&&i.type==='task'?' ('+fmtDur(i.dur)+')':''} · ${TL[i.type]}${area(i.areaId)?' · '+esc(area(i.areaId).name):''}</small></button>`};
   const tl=hrs.map(h=>{const at=items.filter(i=>i.time&&+i.time.slice(0,2)===h);
     if(!at.length&&h!==nowH&&(h%2))return'';
     return`<div class="h ${h===nowH?'now':''}"><span>${pad(h)}:00</span></div><div class="s">${at.map(ev).join('')}</div>`}).join('');
@@ -364,7 +367,7 @@ function vCal(){
   <button class="ib" data-a="shift" data-n="-1" aria-label="Anterior">${ic('back')}</button><button class="ib" data-a="shift" data-n="1" aria-label="Seguinte">${ic('fwd')}</button></div>
   <div class="tabs"><button class="tab ${ui.monthOpen?'':'on'}" data-a="mode" data-m="0">Semana</button><button class="tab ${ui.monthOpen?'on':''}" data-a="mode" data-m="1">Mês</button><button class="tab" data-a="day" data-d="${t}">Hoje</button></div>
   ${body}
-  <h2 style="margin-top:0">${ui.day===t?'Hoje':fmt(ui.day)}<button data-a="new" data-d="${ui.day}">+ Adicionar</button></h2>
+  <h2 style="margin-top:0"><span>${ui.day===t?'Hoje':fmt(ui.day)}${(()=>{const m=items.filter(i=>i.type==='task').reduce((a,i)=>a+(+i.dur||0),0);return m?`<small style="display:block;font-size:13px;font-weight:500;color:var(--mut)">${fmtDur(m)} de tarefas planeadas</small>`:''})()}</span><button data-a="new" data-d="${ui.day}">+ Adicionar</button></h2>
   ${dueG.length?`<div class="list" style="margin-bottom:12px">${dueG.map(row).join('')}</div>`:''}
   ${untimed.length||early.length?`<div class="list" style="margin-bottom:16px">${untimed.concat(early).map(row).join('')}</div>`:''}
   <div class="tl">${tl}</div>`;
@@ -413,7 +416,7 @@ function vStats(){
   if(P===7){for(let k=6;k>=0;k--){const d=addD(t,-k);cols.push({l:k?DOW[parse(d).getDay()].slice(0,3):'Hoje',v:tasks.filter(i=>isDone(i)&&dAt(i)===d).length})}}
   else{const n=P===30?5:12;for(let k=n-1;k>=0;k--){const e=addD(t,-7*k),b0=addD(e,-6);const x=parse(b0);cols.push({l:`${x.getDate()}/${x.getMonth()+1}`,v:tasks.filter(i=>isDone(i)&&dAt(i)>=b0&&dAt(i)<=e).length})}}
   const mx=Math.max(1,...cols.map(c=>c.v));
-  const areaRows=S.areas.map(a=>{const its=tasks.filter(i=>i.areaId===a.id),dn=its.filter(isDone).length;return{a,n:its.length,dn,p:its.length?Math.round(dn/its.length*100):0}}).filter(r=>r.n).sort((x,y)=>y.p-x.p);
+  const areaRows=S.areas.map(a=>{const its=tasks.filter(i=>i.areaId===a.id),dn=its.filter(isDone).length;return{a,n:its.length,dn,m:its.filter(isDone).reduce((x,i)=>x+(+i.dur||0),0),p:its.length?Math.round(dn/its.length*100):0}}).filter(r=>r.n).sort((x,y)=>y.p-x.p);
   const act=goals.filter(g=>!isDone(g));
   const avg=act.length?Math.round(act.reduce((s,g)=>s+goalProg(g).p,0)/act.length):0;
   const pace=g=>{const p=goalProg(g).p;if(!g.due||!g.date)return['nd','Sem prazo'];
@@ -427,6 +430,7 @@ function vStats(){
   <div class="c1"><span>Taxa de conclusão</span><b>${rate}<small>%</small></b></div>
   <div class="c2"><span>Em atraso</span><b>${late.length}<small>tarefas</small></b></div>
   <div class="c4"><span>Dias seguidos</span><b>${streak}<small>${streak===1?'dia':'dias'}</small></b></div></div>
+  ${(()=>{const m=doneP.reduce((a,i)=>a+(+i.dur||0),0),pl=tasks.filter(i=>!isDone(i)).reduce((a,i)=>a+(+i.dur||0),0);return`<div class="box" style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:12px"><div><span style="font-size:13px;color:var(--mut);font-weight:600">Tempo em tarefas concluídas</span><br><b style="font-size:24px;color:var(--acc)">${fmtDur(m)||'0m'}</b></div><div><span style="font-size:13px;color:var(--mut);font-weight:600">Tempo por fazer</span><br><b style="font-size:24px">${fmtDur(pl)||'0m'}</b></div></div>`})()}
   <h2>Concluídas ${P===7?'por dia':'por semana'}</h2>
   <div class="box"><div class="cols">${cols.map(c=>`<div><strong>${c.v||''}</strong><i class="${c.v?'':'z'}" style="height:${Math.round(c.v/mx*100)}%"></i><em>${c.l}</em></div>`).join('')}</div></div>
   <h2>Objetivos</h2>
@@ -436,7 +440,7 @@ function vStats(){
     return`<button data-a="open" data-id="${g.id}" style="text-align:left"><div class="l"><b><span class="dot" style="background:${acol(g.areaId)}"></span>${esc(g.title)}</b><span class="tag ${c}">${l}</span></div>
     <div class="bm"><span>${g.due?'até '+fmt(g.due):'sem prazo'}</span><b>${p.p}%</b></div><div class="bar"><i style="width:${p.p}%;background:${acol(g.areaId)}"></i></div></button>`}).join('')}</div>`:empty('Sem objetivos ativos.')}
   <h2>Tarefas por área</h2>
-  ${areaRows.length?`<div class="box hr">${areaRows.map(r=>`<div><div class="l"><b><span class="dot" style="background:${r.a.color}"></span>${esc(r.a.name)}</b><span>${r.dn} de ${r.n} · ${r.p}%</span></div><div class="bar"><i style="width:${r.p}%;background:${r.a.color}"></i></div></div>`).join('')}</div>`:empty('Ainda sem tarefas.')}
+  ${areaRows.length?`<div class="box hr">${areaRows.map(r=>`<div><div class="l"><b><span class="dot" style="background:${r.a.color}"></span>${esc(r.a.name)}</b><span>${r.dn} de ${r.n} · ${r.p}%${r.m?' · '+fmtDur(r.m):''}</span></div><div class="bar"><i style="width:${r.p}%;background:${r.a.color}"></i></div></div>`).join('')}</div>`:empty('Ainda sem tarefas.')}
   <h2>Pendentes por prioridade</h2>
   <div class="box hr">${pend.map(x=>`<div><div class="l"><b><span class="chip p-${x.k}">${PL[x.k].replace(' prioridade','')}</span></b><span>${x.n} ${x.n===1?'tarefa':'tarefas'}</span></div><div class="bar"><i style="width:${Math.round(x.n/pt*100)}%;background:var(--${x.k==='alta'?'hi':x.k==='media'?'mid':'lo'})"></i></div></div>`).join('')}</div>
   ${late.length?`<h2>Em atraso</h2><div class="list">${late.sort((a,b)=>a.date.localeCompare(b.date)).map(row).join('')}</div>`:''}`;
@@ -455,7 +459,7 @@ function vDetail(){
   <div class="chips"><span class="chip p-${i.priority}">${PL[i.priority]}</span>${a?`<span class="chip" style="background:${tint(c,20)};color:${c}">${esc(a.name)}</span>`:''}${i.type!=='event'?`<span class="chip" style="background:var(--acc2);color:var(--acc)">${i.type==='goal'?(isDone(i)?'Alcançado':SL[i.status]):SL[i.status]}</span>`:''}</div>
   <h1>${esc(i.title)}</h1>
   <div class="dates"><div><i>${ic('cal')}</i><span><small>${i.type==='goal'?'Início':'Data'}</small><b>${i.date?fmt(i.date):'—'}</b></span></div>
-  <div><i>${ic(i.type==='goal'?'target':'clock')}</i><span><small>${i.type==='goal'?'Prazo':'Hora'}</small><b>${i.type==='goal'?(i.due?fmt(i.due):'—'):(i.time?i.time+(i.end?' – '+i.end:''):'Sem hora')}</b></span></div></div>
+  <div><i>${ic(i.type==='goal'?'target':'cal')}</i><span><small>${i.type==='goal'?'Prazo':'Hora'}</small><b>${i.type==='goal'?(i.due?fmt(i.due):'—'):(i.time?i.time+(endOf(i)?' – '+endOf(i):''):'Sem hora')}</b></span></div>${i.type==='task'?`<div><i>${ic('clock')}</i><span><small>Duração</small><b>${i.dur?fmtDur(i.dur):'—'}</b></span></div>`:''}</div>
   ${goal?`<h2>Objetivo</h2><div class="list">${row(goal)}</div>`:''}
   ${i.notes?`<h2>Descrição</h2><p class="txt">${esc(i.notes)}</p>`:''}
   ${prog}
@@ -485,6 +489,7 @@ function sheetHTML(){
   <label class="fl"><span>Área</span><select class="in" name="areaId"><option value="">Sem área</option>${S.areas.map(a=>`<option value="${a.id}" ${d.areaId===a.id?'selected':''}>${esc(a.name)}</option>`).join('')}</select></label>
   <div class="row2"><label class="fl"><span>${d.type==='goal'?'Início':'Data'}</span><input class="in" type="date" name="date" value="${d.date||''}"></label>
   ${d.type==='goal'?`<label class="fl"><span>Prazo</span><input class="in" type="date" name="due" value="${d.due||''}"></label>`:`<label class="fl"><span>${d.type==='event'?'Início':'Hora'}</span><input class="in" type="time" name="time" value="${d.time||''}"></label>`}</div>
+  ${d.type==='task'?`<div class="fl"><span>Duração</span><div class="row2"><label style="display:flex;align-items:center;gap:8px"><input class="in" type="number" inputmode="numeric" min="0" max="23" name="durH" value="${Math.floor((+d.dur||0)/60)||''}" placeholder="0" aria-label="Horas"><span style="color:var(--mut)">h</span></label><label style="display:flex;align-items:center;gap:8px"><input class="in" type="number" inputmode="numeric" min="0" max="59" step="5" name="durM" value="${(+d.dur||0)%60||''}" placeholder="0" aria-label="Minutos"><span style="color:var(--mut)">min</span></label></div><div class="chips" style="margin-top:4px">${[15,30,45,60,90,120].map(m=>`<button type="button" class="tab" style="min-height:34px;padding:5px 12px" data-a="dur" data-m="${m}">${fmtDur(m)}</button>`).join('')}</div></div>`:''}
   ${d.type==='event'?`<div class="row2"><span></span><label class="fl"><span>Fim</span><input class="in" type="time" name="end" value="${d.end||''}"></label></div>`:''}
   <label class="fl"><span>Prioridade</span><select class="in" name="priority">${['alta','media','baixa'].map(p=>`<option value="${p}" ${d.priority===p?'selected':''}>${PL[p].replace(' prioridade','')}</option>`).join('')}</select></label>
   ${d.type==='task'&&goals.length?`<label class="fl"><span>Contribui para o objetivo</span><select class="in" name="goalId"><option value="">Nenhum</option>${goals.map(g=>`<option value="${g.id}" ${d.goalId===g.id?'selected':''}>${esc(g.title)}</option>`).join('')}</select></label>`:''}
@@ -493,10 +498,11 @@ function sheetHTML(){
   <button type="button" class="tab" style="justify-self:start" data-a="subAdd">+ Adicionar passo</button></div>
   <button class="btn" style="width:100%;margin-top:6px">Guardar</button></form></div></div>`;
 }
-function newItem(o){return Object.assign({id:'',type:'task',title:'',areaId:ui.area||'',date:ui.view==='cal'?ui.day:today(),time:'',end:'',due:'',priority:'media',status:'todo',goalId:'',notes:'',subs:[]},o||{})}
+function newItem(o){return Object.assign({id:'',type:'task',title:'',areaId:ui.area||'',date:ui.view==='cal'?ui.day:today(),time:'',end:'',due:'',priority:'media',status:'todo',goalId:'',dur:0,notes:'',subs:[]},o||{})}
 function readForm(){
   const f=document.querySelector('form[data-f=item]');if(!f)return;const d=ui.sheet.d;
   const fd=new FormData(f);for(const[k,v]of fd)d[k]=v;
+  if('durH' in d||'durM' in d){d.dur=Math.min(1439,Math.max(0,(parseInt(d.durH)||0)*60+(parseInt(d.durM)||0)));delete d.durH;delete d.durM}
   d.subs=[...f.querySelectorAll('[data-sub]')].map((el,k)=>({t:el.value,d:(d.subs[k]||{}).d||false}));
 }
 
@@ -543,6 +549,7 @@ document.addEventListener('click',e=>{
     case'areaEd':ui.sheet={kind:'area',d:Object.assign({},area(ui.area))};render();break;
     case'col':{const f=document.querySelector('form[data-f=area]');ui.sheet.d.name=f.querySelector('[name=n]').value;ui.sheet.d.color=b.dataset.c;render();break}
     case'areaDel':{const aid=ui.sheet.d.id;ui.sheet={kind:'confirm',title:'Apagar esta área?',text:'Os itens desta área ficam sem área, não são apagados.',ok:'Apagar área',fn:()=>{S.areas=S.areas.filter(x=>x.id!==aid);S.items.forEach(x=>{if(x.areaId===aid)x.areaId=''});ui.area=null;if(stack.length)try{history.back()}catch(e){stack.pop()}}};render();break}
+    case'dur':readForm();ui.sheet.d.dur=+b.dataset.m;render();break;
     case'per':ui.per=+b.dataset.p;render();break;
     case'bk':ui.sheet={kind:'bk'};render();break;
     case'exp':{const bl=new Blob([JSON.stringify(S,null,2)],{type:'application/json'});const u=URL.createObjectURL(bl);const l=document.createElement('a');l.href=u;l.download='foco-'+today()+'.json';document.body.appendChild(l);l.click();l.remove();setTimeout(()=>URL.revokeObjectURL(u),1000);toast('Ficheiro exportado');break}
@@ -556,7 +563,7 @@ document.addEventListener('submit',e=>{
     if(d.id)Object.assign(area(d.id),d);else S.areas.push(Object.assign(d,{id:uid()}));ui.sheet=null;commit('Área guardada');return}
   readForm();const d=ui.sheet.d;d.title=d.title.trim();if(!d.title)return;
   d.subs=d.subs.filter(s=>s.t.trim());
-  if(d.type!=='task')d.goalId='';if(d.type!=='event')d.end='';if(d.type==='goal')d.time='';
+  if(d.type!=='task'){d.goalId='';d.dur=0}if(d.type!=='event')d.end='';if(d.type==='goal')d.time='';
   if(d.id){const i=S.items.findIndex(x=>x.id===d.id);S.items[i]=d}else{d.id=uid();S.items.push(d)}
   if(isDone(d)&&!d.doneAt)d.doneAt=today();ui.sheet=null;commit('Guardado');
 });
