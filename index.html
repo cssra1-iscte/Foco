@@ -202,6 +202,8 @@ textarea.in{min-height:80px;resize:vertical}
 .rdn.d{background:var(--acc);border-color:var(--acc);color:#fff}
 .rdn:disabled{opacity:.35}
 .list.rl{gap:6px}
+.it.rs{width:100%;min-height:0;padding:8px 12px;margin-bottom:12px;text-align:left}.it.rs>svg{width:18px;height:18px;color:var(--mut);flex:none}.it.rs .rdn{width:28px;height:28px}.it.rs .rdn svg{width:14px;height:14px}
+.rp{font-size:13px;font-weight:700;color:var(--acc);background:var(--acc2);border-radius:99px;padding:4px 10px;flex:none}
 .it.rc{min-height:0;padding:5px 5px 5px 14px;border-radius:14px;gap:8px}
 .it.rc .tt{font-size:14px}
 .it.rc .fl{font-size:12px;color:var(--mut);flex:none;font-weight:600;display:flex;align-items:center;line-height:1}
@@ -445,7 +447,9 @@ function vCal(){
   ${body}
   <h2 style="margin-top:0"><span>${ui.day===t?'Hoje':fmt(ui.day)}${(()=>{const m=items.filter(i=>i.type==='task').reduce((a,i)=>a+(+i.dur||0),0);return m?`<small style="display:block;font-size:13px;font-weight:500;color:var(--mut)">${fmtDur(m)} de tarefas planeadas</small>`:''})()}</span><button data-a="new" data-d="${ui.day}">+ Adicionar</button></h2>
   ${dueG.length?`<div class="list" style="margin-bottom:12px">${dueG.map(row).join('')}</div>`:''}
-  ${(()=>{const rt=S.routines.filter(r=>dueOn(r,ui.day)||(r.log||{})[ui.day]);return rt.length?`<div style="font-size:13px;font-weight:600;color:var(--mut);margin:0 0 8px">Rotinas</div><div class="list rl" style="margin-bottom:12px">${rt.map(r=>rRow(r,ui.day,1)).join('')}</div>`:''})()}
+  ${(()=>{const rt=S.routines.filter(r=>dueOn(r,ui.day)||(r.log||{})[ui.day]);if(!rt.length)return'';const dn=rt.filter(r=>(r.log||{})[ui.day]).length;
+    // single summary row; opens the routines list
+    return`<button class="it rs" data-a="go" data-v="routines"><span class="ty" style="background:var(--acc2);color:var(--acc)">${ic('loop')}</span><span class="bd"><span class="tt">${ui.day===t?'Rotinas de hoje':'Rotinas'}</span><span class="mt">${dn} de ${rt.length} feitas</span></span>${dn===rt.length?`<span class="rdn d">${ic('check',3)}</span>`:`<span class="rp">${dn}/${rt.length}</span>`}${ic('fwd')}</button>`})()}
   ${untimed.length||early.length?`<div class="list" style="margin-bottom:16px">${untimed.concat(early).map(row).join('')}</div>`:''}
   <div class="tl">${tl}</div>`;
 }
