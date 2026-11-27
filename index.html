@@ -302,7 +302,18 @@ function rStats(r,from){
 }
 const daysTxt=r=>{const d=rDays(r);if(d.length===7)return'Todos os dias';if(d.length===5&&!d.includes(0)&&!d.includes(6))return'Dias úteis';if(d.length===2&&d.includes(0)&&d.includes(6))return'Fim de semana';return[1,2,3,4,5,6,0].filter(k=>d.includes(k)).map(k=>DOW[k]).join(', ')};
 const nDias=n=>n+' '+(n===1?'dia':'dias');
-const itemsOn=d=>S.items.filter(i=>i.type!=='goal'&&i.date===d).sort((a,b)=>(a.time||'99').localeCompare(b.time||'99'));
+/* recurring events: rep = d|w|m|y, until = optional end date, done = {date:true} per occurrence */
+const RL={'':'Não repete',d:'Todos os dias',w:'Todas as semanas',m:'Todos os meses',y:'Todos os anos'};
+const occurs=(i,d)=>{if(!i.rep||i.type!=='event')return i.date===d;if(!i.date||d<i.date||(i.until&&d>i.until))return false;
+  const a=parse(i.date),b=parse(d);
+  return i.rep==='d'||(i.rep==='w'&&a.getDay()===b.getDay())||(i.rep==='m'&&a.getDate()===b.getDate())||(i.rep==='y'&&a.getDate()===b.getDate()&&a.getMonth()===b.getMonth())};
+const isRec=i=>i.type==='event'&&!!i.rep;
+// occurrence copy of a recurring event on date d (status follows that day)
+const occ=(i,d)=>isRec(i)?Object.assign({},i,{date:d,_occ:d,status:(i.done||{})[d]?'done':'todo'}):i;
+const nextOcc=(i,from)=>{if(!isRec(i))return i.date;let d=from<i.date?i.date:from;for(let k=0;k<400;k++,d=addD(d,1)){if(i.until&&d>i.until)break;if(occurs(i,d))return d}return''};
+// recurring events become their next occurrence (or last start date if the series ended)
+const expand=list=>list.map(i=>isRec(i)?occ(i,nextOcc(i,today())||i.date):i);
+const itemsOn=d=>S.items.filter(i=>i.type!=='goal'&&occurs(i,d)).map(i=>occ(i,d)).sort((a,b)=>(a.time||'99').localeCompare(b.time||'99'));
 
 /* ---------- persistence ---------- */
 function save(){
@@ -341,15 +352,15 @@ function start(withSamples){
 }
 
 /* ---------- pieces ---------- */
-const evBtn=i=>`<button class="rdn ${isDone(i)?'d':''}" data-a="tog" data-id="${i.id}" aria-label="${isDone(i)?'Desmarcar evento':'Marcar evento como feito'}" aria-pressed="${isDone(i)}">${ic('check',3)}</button>`;
+const evBtn=i=>`<button class="rdn ${isDone(i)?'d':''}" data-a="tog" data-id="${i.id}" data-d="${i._occ||''}" aria-label="${isDone(i)?'Desmarcar evento':'Marcar evento como feito'}" aria-pressed="${isDone(i)}">${ic('check',3)}</button>`;
 function row(i){
   const c=acol(i.areaId),a=area(i.areaId);
   const lead=i.type==='task'
     ?`<button class="ck ${isDone(i)?'d':''}" data-a="tog" data-id="${i.id}" aria-label="Marcar como concluída">${isDone(i)?ic('check',3):''}</button>`
     :`<span class="ty" style="background:${tint(c,18)};color:${c}">${ic(i.type==='event'?'event':'target')}</span>`;
-  const when=[fmtS(i.date),i.time?(i.time+(endOf(i)?'–'+endOf(i):'')):'',i.type==='task'&&i.dur&&!i.time?'⏱ '+fmtDur(i.dur):''].filter(Boolean).join(' · ');
+  const when=[fmtS(i.date),i.time?(i.time+(endOf(i)?'–'+endOf(i):'')):'',i.type==='task'&&i.dur&&!i.time?'⏱ '+fmtDur(i.dur):'',isRec(i)?'🔁':''].filter(Boolean).join(' · ');
   return`<div class="it ${i.type!=='goal'&&isDone(i)?'done':''}">${lead}
-  <button class="bd" data-a="open" data-id="${i.id}"><span class="tt">${em(i)}${esc(i.title)}</span>
+  <button class="bd" data-a="open" data-id="${i.id}" data-d="${i._occ||''}"><span class="tt">${em(i)}${esc(i.title)}</span>
   <span class="mt">${a?`<span style="display:inline-flex;gap:5px;align-items:center"><span class="dot" style="background:${c};width:7px;height:7px"></span>${esc(a.name)}</span>`:''}${when?`<span>${when}</span>`:''}${i.type==='task'&&i.status==='doing'?'<span style="color:var(--acc);font-weight:600">Em progresso</span>':''}</span></button>
   ${i.priority==='alta'&&!isDone(i)?'<span class="chip p-alta">Alta</span>':''}${i.type==='event'?evBtn(i):''}</div>`;
 }
@@ -374,7 +385,7 @@ function rRow(r,d,cmp){
 const backBar=t=>`<div class="top"><button class="ib" data-a="back" aria-label="Voltar">${ic('back')}</button><b class="sp" style="text-align:center">${t}</b><span style="width:44px;flex:none"></span></div>`;
 // in-app history so the phone back button works too
 const stack=[];
-function nav(ch){stack.push({view:ui.view,detail:ui.detail,area:ui.area,rt:ui.rt});Object.assign(ui,ch);try{history.pushState({n:stack.length},'')}catch(e){}scrollTo(0,0);render()}
+function nav(ch){stack.push({view:ui.view,detail:ui.detail,area:ui.area,rt:ui.rt,occ:ui.occ});Object.assign(ui,ch);try{history.pushState({n:stack.length},'')}catch(e){}scrollTo(0,0);render()}
 function goBack(){if(stack.length){try{history.back();return}catch(e){}}restore(stack.pop())}
 function restore(p){Object.assign(ui,{rt:null},p||{view:'home',detail:null,area:null});scrollTo(0,0);render()}
 addEventListener('popstate',()=>{if(ui.sheet){ui.sheet=null;try{history.pushState({},'')}catch(e){}render();return}restore(stack.pop())});
@@ -394,7 +405,7 @@ function vWelcome(){
 }
 function vHome(){
   const t=today(),w=addD(t,7);
-  const tasks=S.items.filter(i=>i.type!=='goal');
+  const tasks=expand(S.items.filter(i=>i.type!=='goal'));
   const cnt={today:tasks.filter(i=>i.date===t&&!isDone(i)).length,doing:S.items.filter(i=>i.status==='doing').length,
     done:tasks.filter(isDone).length,next:tasks.filter(i=>i.date>t&&i.date<=w&&!isDone(i)).length};
   const goals=S.items.filter(i=>i.type==='goal'&&!isDone(i)).sort((a,b)=>(a.due||'9').localeCompare(b.due||'9'));
@@ -418,9 +429,11 @@ function vHome(){
 }
 function vCal(){
   const d=parse(ui.day),t=today();
-  const has=new Set(S.items.filter(i=>i.type!=='goal').map(i=>i.date));
+  const has=new Set(S.items.filter(i=>i.type!=='goal'&&!isRec(i)).map(i=>i.date));
+  const recs=S.items.filter(isRec),recD=[];
+  if(recs.length)for(let k=-45;k<=45;k++){const s=addD(ui.day,k);recs.forEach(i=>{if(occurs(i,s)){has.add(s);recD.push([s,i])}})}
   S.items.filter(i=>i.type==='goal'&&i.due).forEach(g=>has.add(g.due));
-  const emos={};S.items.forEach(i=>{const k=i.type==='goal'?i.due:i.date;if(k&&i.emoji){(emos[k]=emos[k]||[]);if(!emos[k].includes(i.emoji))emos[k].push(i.emoji)}});
+  const emos={};S.items.filter(i=>!isRec(i)).map(i=>[i.type==='goal'?i.due:i.date,i]).concat(recD).forEach(([k,i])=>{if(k&&i.emoji){(emos[k]=emos[k]||[]);if(!emos[k].includes(i.emoji))emos[k].push(i.emoji)}});
   const mark=(s,n)=>emos[s]?`<span class="ems">${emos[s].slice(0,n).map(esc).join('')}</span>`:has.has(s)?'<u></u>':'';
   let body='';
   if(ui.monthOpen){
@@ -435,7 +448,7 @@ function vCal(){
   const items=itemsOn(ui.day),untimed=items.filter(i=>!i.time),dueG=S.items.filter(i=>i.type==='goal'&&i.due===ui.day);
   const hrs=[];for(let h=6;h<=23;h++)hrs.push(h);
   const nowH=ui.day===t?new Date().getHours():-1;
-  const ev=i=>{const c=acol(i.areaId);return`<button class="ev" data-a="open" data-id="${i.id}" style="background:${tint(c,20)};${isDone(i)?'opacity:.55':''}"><b style="${isDone(i)?'text-decoration:line-through':''}">${em(i)}${esc(i.title)}</b><small>${i.time}${endOf(i)?' – '+endOf(i):''}${i.dur&&i.type==='task'?' ('+fmtDur(i.dur)+')':''} · ${TL[i.type]}${area(i.areaId)?' · '+esc(area(i.areaId).name):''}</small></button>`};
+  const ev=i=>{const c=acol(i.areaId);return`<button class="ev" data-a="open" data-id="${i.id}" data-d="${i._occ||''}" style="background:${tint(c,20)};${isDone(i)?'opacity:.55':''}"><b style="${isDone(i)?'text-decoration:line-through':''}">${em(i)}${esc(i.title)}</b><small>${i.time}${endOf(i)?' – '+endOf(i):''}${i.dur&&i.type==='task'?' ('+fmtDur(i.dur)+')':''} · ${TL[i.type]}${isRec(i)?' 🔁':''}${area(i.areaId)?' · '+esc(area(i.areaId).name):''}</small></button>`};
   const evR=i=>i.type==='event'?`<div class="evw">${ev(i)}${evBtn(i)}</div>`:ev(i);
   const tl=hrs.map(h=>{const at=items.filter(i=>i.time&&+i.time.slice(0,2)===h);
     if(!at.length&&h!==nowH&&(h%2))return'';
@@ -577,6 +590,8 @@ function vStats(){
   <div class="box hr">${pend.map(x=>`<div><div class="l"><b><span class="chip p-${x.k}">${PL[x.k].replace(' prioridade','')}</span></b><span>${x.n} ${x.n===1?'tarefa':'tarefas'}</span></div><div class="bar"><i style="width:${Math.round(x.n/pt*100)}%;background:var(--${x.k==='alta'?'hi':x.k==='media'?'mid':'lo'})"></i></div></div>`).join('')}</div>
   ${late.length?`<h2>Em atraso</h2><div class="list">${late.sort((a,b)=>a.date.localeCompare(b.date)).map(row).join('')}</div>`:''}`;
 }
+// occurrence shown in detail: the one tapped, else the next one
+const dOcc=i=>ui.occ&&occurs(i,ui.occ)?ui.occ:(nextOcc(i,today())||i.date);
 function vDetail(){
   const i=S.items.find(x=>x.id===ui.detail);if(!i){ui.detail=null;return null}
   const a=area(i.areaId),c=acol(i.areaId);
@@ -592,13 +607,13 @@ function vDetail(){
   return`<div class="dt"><div class="top"><button class="ib" data-a="back" aria-label="Voltar">${ic('back')}</button><b class="sp" style="text-align:center">${TL[i.type]}</b><button class="ib" data-a="edit" aria-label="Editar">${ic('edit')}</button></div>
   <div class="chips"><span class="chip p-${i.priority}">${PL[i.priority]}</span>${a?`<span class="chip" style="background:${tint(c,20)};color:${c}">${esc(a.name)}</span>`:''}${i.type!=='event'?`<span class="chip" style="background:var(--acc2);color:var(--acc)">${i.type==='goal'?(isDone(i)?'Alcançado':SL[i.status]):SL[i.status]}</span>`:''}</div>
   <h1>${i.emoji?`<span style="margin-right:10px">${esc(i.emoji)}</span>`:''}${esc(i.title)}</h1>
-  <div class="dates"><div><i>${ic('cal')}</i><span><small>${i.type==='goal'?'Início':'Data'}</small><b>${i.date?fmt(i.date):'—'}</b></span></div>
-  <div><i>${ic(i.type==='goal'?'target':'cal')}</i><span><small>${i.type==='goal'?'Prazo':'Hora'}</small><b>${i.type==='goal'?(i.due?fmt(i.due):'—'):(i.time?i.time+(endOf(i)?' – '+endOf(i):''):'Sem hora')}</b></span></div>${i.type==='task'?`<div><i>${ic('clock')}</i><span><small>Duração</small><b>${i.dur?fmtDur(i.dur):'—'}</b></span></div>`:''}</div>
+  <div class="dates"><div><i>${ic('cal')}</i><span><small>${i.type==='goal'?'Início':isRec(i)?'Dia':'Data'}</small><b>${isRec(i)?fmt(dOcc(i)):i.date?fmt(i.date):'—'}</b></span></div>
+  <div><i>${ic(i.type==='goal'?'target':'cal')}</i><span><small>${i.type==='goal'?'Prazo':'Hora'}</small><b>${i.type==='goal'?(i.due?fmt(i.due):'—'):(i.time?i.time+(endOf(i)?' – '+endOf(i):''):'Sem hora')}</b></span></div>${isRec(i)?`<div><i>${ic('loop')}</i><span><small>Repete</small><b>${RL[i.rep]}${i.until?' até '+fmt(i.until):''}</b></span></div>`:''}${i.type==='task'?`<div><i>${ic('clock')}</i><span><small>Duração</small><b>${i.dur?fmtDur(i.dur):'—'}</b></span></div>`:''}</div>
   ${goal?`<h2>Objetivo</h2><div class="list">${row(goal)}</div>`:''}
   ${i.notes?`<h2>Descrição</h2><p class="txt">${esc(i.notes)}</p>`:''}
   ${prog}
   ${(i.subs||[]).length?`<h2>Checklist</h2><div class="sub">${i.subs.map((s,k)=>`<label><input type="checkbox" data-a="sub" data-k="${k}" ${s.d?'checked':''}><span class="${s.d?'x':''}">${esc(s.t)}</span></label>`).join('')}</div>`:''}
-  ${i.type==='event'?`<h2>Estado</h2><div class="seg" style="grid-template-columns:1fr 1fr">${['todo','done'].map(s=>`<button class="${(isDone(i)?'done':'todo')===s?'on':''}" data-a="stat" data-s="${s}">${s==='done'?'Feito':'Por fazer'}</button>`).join('')}</div>`:''}
+  ${i.type==='event'?`<h2>Estado${isRec(i)?` <small style="font-size:13px;font-weight:600;color:var(--mut)">${fmtS(dOcc(i))}</small>`:''}</h2><div class="seg" style="grid-template-columns:1fr 1fr">${['todo','done'].map(s=>`<button class="${(isDone(occ(i,dOcc(i)))?'done':'todo')===s?'on':''}" data-a="stat" data-s="${s}">${s==='done'?'Feito':'Por fazer'}</button>`).join('')}</div>`:''}
   ${i.type!=='event'?`<h2>Estado</h2><div class="seg">${['todo','doing','done'].map(s=>`<button class="${i.status===s?'on':''}" data-a="stat" data-s="${s}">${i.type==='goal'&&s==='done'?'Alcançado':SL[s]}</button>`).join('')}</div>`:''}
   <div class="acts"><button class="btn r" data-a="del" aria-label="Apagar">${ic('trash')}</button><button class="btn" data-a="edit">Editar</button></div></div>`;
 }
@@ -641,7 +656,9 @@ function sheetHTML(){
   <div class="row2"><label class="fl"><span>${d.type==='goal'?'Início':'Data'}</span><input class="in" type="date" name="date" value="${d.date||''}"></label>
   ${d.type==='goal'?`<label class="fl"><span>Prazo</span><input class="in" type="date" name="due" value="${d.due||''}"></label>`:`<label class="fl"><span>${d.type==='event'?'Início':'Hora'}</span><input class="in" type="time" name="time" value="${d.time||''}"></label>`}</div>
   ${d.type==='task'?`<div class="fl"><span>Duração</span><div class="row2"><label style="display:flex;align-items:center;gap:8px"><input class="in" type="number" inputmode="numeric" min="0" max="23" name="durH" value="${Math.floor((+d.dur||0)/60)||''}" placeholder="0" aria-label="Horas"><span style="color:var(--mut)">h</span></label><label style="display:flex;align-items:center;gap:8px"><input class="in" type="number" inputmode="numeric" min="0" max="59" step="5" name="durM" value="${(+d.dur||0)%60||''}" placeholder="0" aria-label="Minutos"><span style="color:var(--mut)">min</span></label></div><div class="chips" style="margin-top:4px">${[15,30,45,60,90,120].map(m=>`<button type="button" class="tab" style="min-height:34px;padding:5px 12px" data-a="dur" data-m="${m}">${fmtDur(m)}</button>`).join('')}</div></div>`:''}
-  ${d.type==='event'?`<div class="row2"><span></span><label class="fl"><span>Fim</span><input class="in" type="time" name="end" value="${d.end||''}"></label></div>`:''}
+  ${d.type==='event'?`<div class="row2"><span></span><label class="fl"><span>Fim</span><input class="in" type="time" name="end" value="${d.end||''}"></label></div>
+  <div class="row2"><label class="fl"><span>Repetir</span><select class="in" name="rep">${Object.keys(RL).map(k=>`<option value="${k}" ${(d.rep||'')===k?'selected':''}>${RL[k]}</option>`).join('')}</select></label>
+  <label class="fl"><span>Até (opcional)</span><input class="in" type="date" name="until" value="${d.until||''}"></label></div>`:''}
   <label class="fl"><span>Prioridade</span><select class="in" name="priority">${['alta','media','baixa'].map(p=>`<option value="${p}" ${d.priority===p?'selected':''}>${PL[p].replace(' prioridade','')}</option>`).join('')}</select></label>
   ${d.type==='task'&&goals.length?`<label class="fl"><span>Contribui para o objetivo</span><select class="in" name="goalId"><option value="">Nenhum</option>${goals.map(g=>`<option value="${g.id}" ${d.goalId===g.id?'selected':''}>${esc(g.title)}</option>`).join('')}</select></label>`:''}
   <label class="fl"><span>Descrição</span><textarea class="in" name="notes" maxlength="2000">${esc(d.notes||'')}</textarea></label>
@@ -649,7 +666,7 @@ function sheetHTML(){
   <button type="button" class="tab" style="justify-self:start" data-a="subAdd">+ Adicionar passo</button></div>
   <button class="btn" style="width:100%;margin-top:6px">Guardar</button></form></div></div>`;
 }
-function newItem(o){return Object.assign({id:'',type:'task',title:'',areaId:ui.area||'',date:ui.view==='cal'?ui.day:today(),time:'',end:'',due:'',priority:'media',status:'todo',goalId:'',dur:0,emoji:'',notes:'',subs:[]},o||{})}
+function newItem(o){return Object.assign({id:'',type:'task',title:'',areaId:ui.area||'',date:ui.view==='cal'?ui.day:today(),time:'',end:'',due:'',rep:'',until:'',priority:'media',status:'todo',goalId:'',dur:0,emoji:'',notes:'',subs:[]},o||{})}
 function newRoutine(o){return Object.assign({id:'',title:'',emoji:'',areaId:ui.area||'',goalId:'',days:[0,1,2,3,4,5,6],start:today(),notes:'',log:{}},o||{})}
 function readForm(){
   const f=document.querySelector('form[data-f=item],form[data-f=routine]');if(!f)return;const d=ui.sheet.d;
@@ -682,9 +699,13 @@ document.addEventListener('click',e=>{
     case'go':if(ui.view!==b.dataset.v||ui.detail||ui.area||ui.rt)nav({view:b.dataset.v,detail:null,area:null,rt:null});break;
     case'back':goBack();break;
     case'filt':ui.filter=b.dataset.f;render();break;
-    case'open':nav({detail:id,rt:null});break;
-    case'tog':{const i=S.items.find(x=>x.id===id);setSt(i,isDone(i)?'todo':'done');commit(isDone(i)?(i.type==='event'?'Feito ✓':'Concluída ✓'):'');break}
-    case'stat':{const i=cur();setSt(i,b.dataset.s);commit(i.type==='goal'&&isDone(i)?'Objetivo alcançado 🎉':i.type==='event'&&isDone(i)?'Feito ✓':'');break}
+    case'open':nav({detail:id,rt:null,occ:b.dataset.d||null});break;
+    case'tog':{const i=S.items.find(x=>x.id===id);
+      if(isRec(i)){const d=b.dataset.d||today();i.done=i.done||{};if(i.done[d])delete i.done[d];else i.done[d]=true;commit(i.done[d]?'Feito ✓':'');break}
+      setSt(i,isDone(i)?'todo':'done');commit(isDone(i)?(i.type==='event'?'Feito ✓':'Concluída ✓'):'');break}
+    case'stat':{const i=cur();
+      if(isRec(i)){const d=dOcc(i);i.done=i.done||{};if(b.dataset.s==='done')i.done[d]=true;else delete i.done[d];commit(i.done[d]?'Feito ✓':'');break}
+      setSt(i,b.dataset.s);commit(i.type==='goal'&&isDone(i)?'Objetivo alcançado 🎉':i.type==='event'&&isDone(i)?'Feito ✓':'');break}
     case'sub':{const i=cur();i.subs[+b.dataset.k].d=b.checked;commit();break}
     case'del':ui.sheet={kind:'confirm',title:'Apagar este item?',text:'Esta ação não pode ser desfeita.',ok:'Apagar',fn:()=>{S.items=S.items.filter(x=>x.id!==ui.detail);S.items.forEach(x=>{if(x.goalId===ui.detail)x.goalId=''});S.routines.forEach(x=>{if(x.goalId===ui.detail)x.goalId=''});ui.detail=null;if(stack.length)try{history.back()}catch(e){stack.pop()}}};render();break;
     case'ok':{const{fn,msg}=ui.sheet;ui.sheet=null;fn();commit(msg||'Apagado');break}
@@ -734,7 +755,7 @@ document.addEventListener('submit',e=>{
     if(d.id)Object.assign(area(d.id),d);else S.areas.push(Object.assign(d,{id:uid()}));ui.sheet=null;commit('Área guardada');return}
   readForm();const d=ui.sheet.d;d.title=d.title.trim();if(!d.title)return;
   d.subs=d.subs.filter(s=>s.t.trim());d.emoji=(d.emoji||'').trim();
-  if(d.type!=='task'){d.goalId='';d.dur=0}if(d.type!=='event')d.end='';if(d.type==='goal')d.time='';
+  if(d.type!=='task'){d.goalId='';d.dur=0}if(d.type!=='event'){d.end='';d.rep='';d.until=''}if(!d.rep)d.until='';if(d.until&&d.until<d.date)d.until='';if(d.type==='goal')d.time='';
   if(d.id){const i=S.items.findIndex(x=>x.id===d.id);S.items[i]=d}else{d.id=uid();S.items.push(d)}
   if(isDone(d)&&!d.doneAt)d.doneAt=today();ui.sheet=null;commit('Guardado');
 });
