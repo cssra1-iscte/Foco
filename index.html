@@ -196,7 +196,16 @@ textarea.in{min-height:80px;resize:vertical}
 .wd .ems{position:absolute;bottom:3px;left:0;right:0;font-size:11px;line-height:1;white-space:nowrap;overflow:hidden;letter-spacing:-2px}
 .md .ems{position:absolute;bottom:1px;font-size:10px;line-height:1}
 /* routines */
-.it .ck.rd{border-radius:50%}
+.rdn{width:36px;height:36px;border-radius:50%;border:2px solid var(--line);color:#c9c6dc;display:grid;place-items:center;flex:none;transition:background .15s,border-color .15s}
+.rdn svg{width:16px;height:16px}
+.rdn.d{background:var(--acc);border-color:var(--acc);color:#fff}
+.rdn:disabled{opacity:.35}
+.list.rl{gap:6px}
+.it.rc{min-height:0;padding:5px 5px 5px 14px;border-radius:14px;gap:8px}
+.it.rc .tt{font-size:14px}
+.it.rc .fl{font-size:12px;color:var(--mut);flex:none;font-weight:600;display:flex;align-items:center;line-height:1}
+.it.rc .rdn{width:32px;height:32px}
+.it.rc.done{background:var(--bg)}
 .wk{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
 .wk button{min-height:42px;border-radius:12px;background:var(--bg);border:1px solid var(--line);font-weight:700;color:var(--mut)}
 .wk button.on{background:var(--acc);border-color:var(--acc);color:#fff}
@@ -348,15 +357,15 @@ function goalCard(g){
   <div class="bm"><span>${a?esc(a.name):'Sem área'}</span><b>${p.dn} de ${p.tot}</b></div>
   <div class="bar"><i style="width:${p.p}%"></i></div></button>`;
 }
-function rRow(r,d){
+function rRow(r,d,cmp){
   d=d||today();const s=rStats(r),dn=!!(r.log||{})[d],c=rCol(r);
   const g=r.goalId&&S.items.find(x=>x.id===r.goalId);
-  const lead=d<=today()
-    ?`<button class="ck rd ${dn?'d':''}" data-a="rTog" data-id="${r.id}" data-d="${d}" aria-label="Marcar rotina como feita">${dn?ic('check',3):''}</button>`
-    :`<span class="ty" style="background:${tint(c,18)};color:${c}">${ic('loop')}</span>`;
-  return`<div class="it">${lead}
+  // round Done button with a check mark; disabled for future days
+  const btn=`<button class="rdn ${dn?'d':''}" data-a="rTog" data-id="${r.id}" data-d="${d}" ${d>today()?'disabled':''} aria-label="${dn?'Desmarcar rotina':'Marcar rotina como feita'}" aria-pressed="${dn}">${ic('check',3)}</button>`;
+  if(cmp)return`<div class="it rc ${dn?'done':''}"><button class="bd" data-a="rOpen" data-id="${r.id}"><span class="tt">${em(r)}${esc(r.title)}</span></button>${s.cur?`<span class="fl">🔥${s.cur}</span>`:''}${btn}</div>`;
+  return`<div class="it ${dn?'done':''}"><span class="ty" style="background:${tint(c,18)};color:${c}">${ic('loop')}</span>
   <button class="bd" data-a="rOpen" data-id="${r.id}"><span class="tt">${em(r)}${esc(r.title)}</span>
-  <span class="mt"><span>🔥 ${nDias(s.cur)} seguidos</span><span>${s.total} praticados</span>${g?`<span>🎯 ${esc(g.title)}</span>`:''}</span></button></div>`;
+  <span class="mt"><span>🔥 ${nDias(s.cur)} seguidos</span><span>${s.total} praticados</span>${g?`<span>🎯 ${esc(g.title)}</span>`:''}</span></button>${btn}</div>`;
 }
 const backBar=t=>`<div class="top"><button class="ib" data-a="back" aria-label="Voltar">${ic('back')}</button><b class="sp" style="text-align:center">${t}</b><span style="width:44px;flex:none"></span></div>`;
 // in-app history so the phone back button works too
@@ -433,7 +442,7 @@ function vCal(){
   ${body}
   <h2 style="margin-top:0"><span>${ui.day===t?'Hoje':fmt(ui.day)}${(()=>{const m=items.filter(i=>i.type==='task').reduce((a,i)=>a+(+i.dur||0),0);return m?`<small style="display:block;font-size:13px;font-weight:500;color:var(--mut)">${fmtDur(m)} de tarefas planeadas</small>`:''})()}</span><button data-a="new" data-d="${ui.day}">+ Adicionar</button></h2>
   ${dueG.length?`<div class="list" style="margin-bottom:12px">${dueG.map(row).join('')}</div>`:''}
-  ${(()=>{const rt=S.routines.filter(r=>dueOn(r,ui.day)||(r.log||{})[ui.day]);return rt.length?`<div style="font-size:13px;font-weight:600;color:var(--mut);margin:0 0 8px">Rotinas</div><div class="list" style="margin-bottom:12px">${rt.map(r=>rRow(r,ui.day)).join('')}</div>`:''})()}
+  ${(()=>{const rt=S.routines.filter(r=>dueOn(r,ui.day)||(r.log||{})[ui.day]);return rt.length?`<div style="font-size:13px;font-weight:600;color:var(--mut);margin:0 0 8px">Rotinas</div><div class="list rl" style="margin-bottom:12px">${rt.map(r=>rRow(r,ui.day,1)).join('')}</div>`:''})()}
   ${untimed.length||early.length?`<div class="list" style="margin-bottom:16px">${untimed.concat(early).map(row).join('')}</div>`:''}
   <div class="tl">${tl}</div>`;
 }
