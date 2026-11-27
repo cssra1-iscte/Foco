@@ -117,6 +117,7 @@ h2 button{font-size:13px;color:var(--acc);font-weight:600;min-height:32px}
 .ev{border-radius:16px;padding:10px 12px;text-align:left;display:block;width:100%}
 .ev b{display:block;font-size:14px}
 .ev small{font-size:12px;opacity:.8}
+.evw{display:flex;gap:8px;align-items:center}.evw .ev{flex:1;min-width:0}.evw .rdn{background:var(--card)}.evw .rdn.d{background:var(--acc)}
 /* areas */
 .ag{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .ac{border-radius:20px;padding:14px;text-align:left;min-height:130px;display:flex;flex-direction:column;gap:6px}
@@ -338,16 +339,17 @@ function start(withSamples){
 }
 
 /* ---------- pieces ---------- */
+const evBtn=i=>`<button class="rdn ${isDone(i)?'d':''}" data-a="tog" data-id="${i.id}" aria-label="${isDone(i)?'Desmarcar evento':'Marcar evento como feito'}" aria-pressed="${isDone(i)}">${ic('check',3)}</button>`;
 function row(i){
   const c=acol(i.areaId),a=area(i.areaId);
   const lead=i.type==='task'
     ?`<button class="ck ${isDone(i)?'d':''}" data-a="tog" data-id="${i.id}" aria-label="Marcar como concluída">${isDone(i)?ic('check',3):''}</button>`
     :`<span class="ty" style="background:${tint(c,18)};color:${c}">${ic(i.type==='event'?'event':'target')}</span>`;
   const when=[fmtS(i.date),i.time?(i.time+(endOf(i)?'–'+endOf(i):'')):'',i.type==='task'&&i.dur&&!i.time?'⏱ '+fmtDur(i.dur):''].filter(Boolean).join(' · ');
-  return`<div class="it ${i.type==='task'&&isDone(i)?'done':''}">${lead}
+  return`<div class="it ${i.type!=='goal'&&isDone(i)?'done':''}">${lead}
   <button class="bd" data-a="open" data-id="${i.id}"><span class="tt">${em(i)}${esc(i.title)}</span>
   <span class="mt">${a?`<span style="display:inline-flex;gap:5px;align-items:center"><span class="dot" style="background:${c};width:7px;height:7px"></span>${esc(a.name)}</span>`:''}${when?`<span>${when}</span>`:''}${i.type==='task'&&i.status==='doing'?'<span style="color:var(--acc);font-weight:600">Em progresso</span>':''}</span></button>
-  ${i.priority==='alta'&&!isDone(i)?'<span class="chip p-alta">Alta</span>':''}</div>`;
+  ${i.priority==='alta'&&!isDone(i)?'<span class="chip p-alta">Alta</span>':''}${i.type==='event'?evBtn(i):''}</div>`;
 }
 function goalCard(g){
   const p=goalProg(g),c=acol(g.areaId),a=area(g.areaId);
@@ -432,9 +434,10 @@ function vCal(){
   const hrs=[];for(let h=6;h<=23;h++)hrs.push(h);
   const nowH=ui.day===t?new Date().getHours():-1;
   const ev=i=>{const c=acol(i.areaId);return`<button class="ev" data-a="open" data-id="${i.id}" style="background:${tint(c,20)};${isDone(i)?'opacity:.55':''}"><b style="${isDone(i)?'text-decoration:line-through':''}">${em(i)}${esc(i.title)}</b><small>${i.time}${endOf(i)?' – '+endOf(i):''}${i.dur&&i.type==='task'?' ('+fmtDur(i.dur)+')':''} · ${TL[i.type]}${area(i.areaId)?' · '+esc(area(i.areaId).name):''}</small></button>`};
+  const evR=i=>i.type==='event'?`<div class="evw">${ev(i)}${evBtn(i)}</div>`:ev(i);
   const tl=hrs.map(h=>{const at=items.filter(i=>i.time&&+i.time.slice(0,2)===h);
     if(!at.length&&h!==nowH&&(h%2))return'';
-    return`<div class="h ${h===nowH?'now':''}"><span>${pad(h)}:00</span></div><div class="s">${at.map(ev).join('')}</div>`}).join('');
+    return`<div class="h ${h===nowH?'now':''}"><span>${pad(h)}:00</span></div><div class="s">${at.map(evR).join('')}</div>`}).join('');
   const early=items.filter(i=>i.time&&+i.time.slice(0,2)<6);
   return`${backBar('Calendário')}<div class="mh"><b>${MON[d.getMonth()]} ${d.getFullYear()}</b>
   <button class="ib" data-a="shift" data-n="-1" aria-label="Anterior">${ic('back')}</button><button class="ib" data-a="shift" data-n="1" aria-label="Seguinte">${ic('fwd')}</button></div>
@@ -591,6 +594,7 @@ function vDetail(){
   ${i.notes?`<h2>Descrição</h2><p class="txt">${esc(i.notes)}</p>`:''}
   ${prog}
   ${(i.subs||[]).length?`<h2>Checklist</h2><div class="sub">${i.subs.map((s,k)=>`<label><input type="checkbox" data-a="sub" data-k="${k}" ${s.d?'checked':''}><span class="${s.d?'x':''}">${esc(s.t)}</span></label>`).join('')}</div>`:''}
+  ${i.type==='event'?`<h2>Estado</h2><div class="seg" style="grid-template-columns:1fr 1fr">${['todo','done'].map(s=>`<button class="${(isDone(i)?'done':'todo')===s?'on':''}" data-a="stat" data-s="${s}">${s==='done'?'Feito':'Por fazer'}</button>`).join('')}</div>`:''}
   ${i.type!=='event'?`<h2>Estado</h2><div class="seg">${['todo','doing','done'].map(s=>`<button class="${i.status===s?'on':''}" data-a="stat" data-s="${s}">${i.type==='goal'&&s==='done'?'Alcançado':SL[s]}</button>`).join('')}</div>`:''}
   <div class="acts"><button class="btn r" data-a="del" aria-label="Apagar">${ic('trash')}</button><button class="btn" data-a="edit">Editar</button></div></div>`;
 }
@@ -675,8 +679,8 @@ document.addEventListener('click',e=>{
     case'back':goBack();break;
     case'filt':ui.filter=b.dataset.f;render();break;
     case'open':nav({detail:id,rt:null});break;
-    case'tog':{const i=S.items.find(x=>x.id===id);setSt(i,isDone(i)?'todo':'done');commit(isDone(i)?'Concluída ✓':'');break}
-    case'stat':{const i=cur();setSt(i,b.dataset.s);commit(i.type==='goal'&&isDone(i)?'Objetivo alcançado 🎉':'');break}
+    case'tog':{const i=S.items.find(x=>x.id===id);setSt(i,isDone(i)?'todo':'done');commit(isDone(i)?(i.type==='event'?'Feito ✓':'Concluída ✓'):'');break}
+    case'stat':{const i=cur();setSt(i,b.dataset.s);commit(i.type==='goal'&&isDone(i)?'Objetivo alcançado 🎉':i.type==='event'&&isDone(i)?'Feito ✓':'');break}
     case'sub':{const i=cur();i.subs[+b.dataset.k].d=b.checked;commit();break}
     case'del':ui.sheet={kind:'confirm',title:'Apagar este item?',text:'Esta ação não pode ser desfeita.',ok:'Apagar',fn:()=>{S.items=S.items.filter(x=>x.id!==ui.detail);S.items.forEach(x=>{if(x.goalId===ui.detail)x.goalId=''});S.routines.forEach(x=>{if(x.goalId===ui.detail)x.goalId=''});ui.detail=null;if(stack.length)try{history.back()}catch(e){stack.pop()}}};render();break;
     case'ok':{const{fn,msg}=ui.sheet;ui.sheet=null;fn();commit(msg||'Apagado');break}
